@@ -2,6 +2,8 @@ package com.orbit.chat.chat_app_backend.service;
 
 import com.orbit.chat.chat_app_backend.entities.Room;
 import com.orbit.chat.chat_app_backend.repo.RoomRepositories;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,7 +22,13 @@ public class RoomService {
         }
     }
 
-    public void createRoom(Room room) {
-        roomRepositories.save(room);
+    public ResponseEntity<?> createRoom(String roomId) {
+        try {
+            Room room = new Room(roomId);
+            roomRepositories.save(room);
+            return new ResponseEntity<>(room, HttpStatus.CREATED);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 }

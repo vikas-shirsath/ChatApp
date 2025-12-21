@@ -22,5 +22,8 @@ public class Room  {
 
     private List<Message> messages = new ArrayList<>();
 
+    public Room(String roomId) {
+        this.roomId = roomId;
+    }
 
 }

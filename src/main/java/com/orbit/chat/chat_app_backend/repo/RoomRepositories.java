@@ -7,4 +7,5 @@ public interface RoomRepositories extends MongoRepository<Room,String> {
     //get room using room id
     Room findByRoomId(String roomId);
 
+    Room RoomId(String roomId);
 }
