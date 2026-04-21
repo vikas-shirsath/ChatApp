@@ -1,13 +1,21 @@
-# Ignore sensitive config
-src/main/resources/application.properties
-
-HELP.md
+# =============================================================
+# Java / Spring Boot
+# =============================================================
 target/
-.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### STS ###
+# =============================================================
+# IDE Files
+# =============================================================
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
 .apt_generated
 .classpath
 .factorypath
@@ -16,11 +24,8 @@ target/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
+### VS Code ###
+.vscode/
 
 ### NetBeans ###
 /nbproject/private/
@@ -32,5 +37,59 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
-.vscode/
+# =============================================================
+# Maven
+# =============================================================
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/wrapper/MavenWrapperDownloader.java
+
+# =============================================================
+# OS Files
+# =============================================================
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# =============================================================
+# Logs
+# =============================================================
+*.log
+logs/
+
+# =============================================================
+# Environment / Secrets
+# =============================================================
+.env
+*.env
+application-local.properties
+application-secret.properties
+
+# =============================================================
+# Node / Frontend (if frontend is added later)
+# =============================================================
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+
+# =============================================================
+# Misc
+# =============================================================
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+replay_pid*

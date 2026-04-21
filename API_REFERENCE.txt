@@ -1,0 +1,649 @@
+==============================================================================
+   CHATAPP BACKEND API REFERENCE — Full Documentation for Frontend Development
+==============================================================================
+
+Base URL:  http://localhost:8080
+Security:  Currently DISABLED (all endpoints are open, no JWT required)
+           When re-enabled, pass header: Authorization: Bearer <JWT_TOKEN>
+
+
+==============================================================================
+1. AUTHENTICATION APIs
+==============================================================================
+
+--- 1.1  Register a New User ---
+
+  Method:   POST
+  URL:      /auth/register
+  Auth:     Not required
+  Content-Type: application/json
+
+  Request Body:
+  {
+    "username": "alice",            // required, 3-50 chars
+    "email": "alice@example.com",   // required, valid email format
+    "password": "password123"       // required, 6-100 chars
+  }
+
+  Response (201 Created):
+  {
+    "token": "eyJhbGciOiJIUzI1NiJ9...",
+    "userId": "4afa4261-35b9-41d3-b4ce-94649dcb7d6f",
+    "username": "alice",
+    "message": "Registration successful"
+  }
+
+
+--- 1.2  Login ---
+
+  Method:   POST
+  URL:      /auth/login
+  Auth:     Not required
+  Content-Type: application/json
+
+  Request Body:
+  {
+    "username": "alice",       // required
+    "password": "password123"  // required
+  }
+
+  Response (200 OK):
+  {
+    "token": "eyJhbGciOiJIUzI1NiJ9...",
+    "userId": "4afa4261-35b9-41d3-b4ce-94649dcb7d6f",
+    "username": "alice",
+    "message": "Login successful"
+  }
+
+
+--- 1.3  Health Check ---
+
+  Method:   GET
+  URL:      /auth/health
+  Auth:     Not required
+
+  Response (200 OK):
+  "ChatApp is running!"
+
+
+==============================================================================
+2. USER APIs
+==============================================================================
+
+--- 2.1  Get All Users ---
+
+  Method:   GET
+  URL:      /users
+  Auth:     Required (when security is enabled)
+
+  Response (200 OK):
+  [
+    {
+      "id": "4afa4261-35b9-41d3-b4ce-94649dcb7d6f",
+      "username": "alice",
+      "email": "alice@example.com",
+      "publicKey": "MIIBIjANBgkqhk...",   // null if not set
+      "createdAt": "2026-04-22T01:37:11.313117",
+      "online": false
+    },
+    {
+      "id": "f3ac4537-6957-4557-bde7-78f304a27b3f",
+      "username": "bob",
+      "email": "bob@example.com",
+      "publicKey": null,
+      "createdAt": "2026-04-22T01:38:22.123456",
+      "online": true
+    }
+  ]
+
+
+--- 2.2  Get Single User by ID ---
+
+  Method:   GET
+  URL:      /users/{userId}
+  Auth:     Required
+
+  Path Params:
+    userId  (UUID)  — The user's ID
+
+  Response (200 OK):
+  {
+    "id": "4afa4261-35b9-41d3-b4ce-94649dcb7d6f",
+    "username": "alice",
+    "email": "alice@example.com",
+    "publicKey": "MIIBIjANBgkqhk...",
+    "createdAt": "2026-04-22T01:37:11.313117",
+    "online": false
+  }
+
+
+--- 2.3  Upload Public Key (for E2EE) ---
+
+  Method:   PUT
+  URL:      /users/{userId}/public-key
+  Auth:     Required
+  Content-Type: application/json
+
+  Path Params:
+    userId  (UUID)  — The user's ID
+
+  Request Body:
+  {
+    "publicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A..."  // required, RSA public key string
+  }
+
+  Response (200 OK):
+  {
+    "message": "Public key updated successfully"
+  }
+
+
+--- 2.4  Get User's Public Key ---
+
+  Method:   GET
+  URL:      /users/{userId}/public-key
+  Auth:     Required
+
+  Path Params:
+    userId  (UUID)  — The user's ID
+
+  Response (200 OK):
+  {
+    "publicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A..."   // empty string if not set
+  }
+
+
+--- 2.5  Check If User Is Online ---
+
+  Method:   GET
+  URL:      /users/{userId}/online
+  Auth:     Required
+
+  Path Params:
+    userId  (UUID)  — The user's ID
+
+  Response (200 OK):
+  {
+    "online": true
+  }
+
+
+==============================================================================
+3. DIRECT MESSAGING APIs (E2EE)
+==============================================================================
+
+--- 3.1  Send an Encrypted Direct Message ---
+
+  Method:   POST
+  URL:      /messages/send
+  Auth:     Required
+  Content-Type: application/json
+
+  Request Body:
+  {
+    "senderId": "4afa4261-...",         // required, UUID of sender
+    "receiverId": "f3ac4537-...",       // required, UUID of receiver
+    "encryptedPayload": "U2FsdGVk...",  // required, AES-encrypted message (Base64)
+    "encryptedKey": "RSAEncrypted..."   // optional, RSA-encrypted AES key (Base64)
+  }
+
+  Response (201 Created):
+  {
+    "id": "22d5316d-0f4b-4c91-95c2-1731fe480fbc",
+    "senderId": "4afa4261-...",
+    "receiverId": "f3ac4537-...",
+    "groupId": null,
+    "encryptedPayload": "U2FsdGVk...",
+    "encryptedKey": "RSAEncrypted...",
+    "timestamp": "2026-04-22T01:42:14.328981",
+    "status": "SENT"
+  }
+
+
+--- 3.2  Get Chat History Between Two Users ---
+
+  Method:   GET
+  URL:      /messages/{userId}?currentUserId={currentUserId}
+  Auth:     Required
+
+  Path Params:
+    userId        (UUID) — The OTHER user's ID (the person you're chatting with)
+
+  Query Params:
+    currentUserId (UUID) — YOUR user ID
+
+  Response (200 OK):
+  [
+    {
+      "id": "22d5316d-...",
+      "senderId": "4afa4261-...",
+      "receiverId": "f3ac4537-...",
+      "groupId": null,
+      "encryptedPayload": "U2FsdGVk...",
+      "encryptedKey": "RSAEncrypted...",
+      "timestamp": "2026-04-22T01:42:14.328981",
+      "status": "READ"
+    }
+  ]
+
+
+--- 3.3  Update Message Status ---
+
+  Method:   PATCH
+  URL:      /messages/{messageId}/status
+  Auth:     Required
+  Content-Type: application/json
+
+  Path Params:
+    messageId (UUID) — The message ID
+
+  Request Body:
+  {
+    "messageId": "22d5316d-...",   // required, same as path param
+    "status": "READ"              // required, one of: "SENT", "DELIVERED", "READ"
+  }
+
+  Response (200 OK):
+  {
+    "id": "22d5316d-...",
+    "senderId": "4afa4261-...",
+    "receiverId": "f3ac4537-...",
+    "groupId": null,
+    "encryptedPayload": "U2FsdGVk...",
+    "encryptedKey": "RSAEncrypted...",
+    "timestamp": "2026-04-22T01:42:14.328981",
+    "status": "READ"
+  }
+
+
+--- 3.4  Get Undelivered Messages for a User ---
+
+  Method:   GET
+  URL:      /messages/undelivered/{userId}
+  Auth:     Required
+
+  Path Params:
+    userId (UUID) — The user's ID
+
+  Response (200 OK):
+  [
+    {
+      "id": "...",
+      "senderId": "...",
+      "receiverId": "...",
+      "groupId": null,
+      "encryptedPayload": "...",
+      "encryptedKey": "...",
+      "timestamp": "...",
+      "status": "SENT"
+    }
+  ]
+
+
+==============================================================================
+4. GROUP APIs
+==============================================================================
+
+--- 4.1  Create a New Group ---
+
+  Method:   POST
+  URL:      /groups
+  Auth:     Required
+  Content-Type: application/json
+
+  Request Body:
+  {
+    "name": "Project Team",                    // required, group name
+    "createdBy": "4afa4261-...",               // required, UUID of the group creator
+    "memberIds": ["f3ac4537-...", "abc123-..."] // optional, list of member UUIDs to add
+  }
+
+  Response (201 Created):
+  {
+    "id": "3c538929-d280-4178-9665-4a1e70e3ef69",
+    "name": "Project Team",
+    "createdBy": "4afa4261-...",
+    "createdAt": "2026-04-22T01:42:58.908769",
+    "memberCount": 3
+  }
+
+
+--- 4.2  Get All Groups for a User ---
+
+  Method:   GET
+  URL:      /groups/user/{userId}
+  Auth:     Required
+
+  Path Params:
+    userId (UUID) — The user's ID
+
+  Response (200 OK):
+  [
+    {
+      "id": "3c538929-...",
+      "name": "Project Team",
+      "createdBy": "4afa4261-...",
+      "createdAt": "2026-04-22T01:42:58.908769",
+      "memberCount": 3
+    }
+  ]
+
+
+--- 4.3  Add a Member to a Group ---
+
+  Method:   POST
+  URL:      /groups/{groupId}/members
+  Auth:     Required
+  Content-Type: application/json
+
+  Path Params:
+    groupId (UUID) — The group ID
+
+  Request Body:
+  {
+    "userId": "new-user-uuid-...",        // required, UUID of user to add
+    "encryptedGroupKey": "EncKey..."       // optional, encrypted group key for this member
+  }
+
+  Response (200 OK):
+  {
+    "message": "Member added successfully"
+  }
+
+
+--- 4.4  Remove a Member from a Group ---
+
+  Method:   DELETE
+  URL:      /groups/{groupId}/members/{userId}
+  Auth:     Required
+
+  Path Params:
+    groupId (UUID) — The group ID
+    userId  (UUID) — The user to remove
+
+  Response (200 OK):
+  {
+    "message": "Member removed successfully"
+  }
+
+
+--- 4.5  Send an Encrypted Group Message ---
+
+  Method:   POST
+  URL:      /groups/{groupId}/messages
+  Auth:     Required
+  Content-Type: application/json
+
+  Path Params:
+    groupId (UUID) — The group ID
+
+  Request Body:
+  {
+    "senderId": "4afa4261-...",            // required, UUID of sender
+    "encryptedPayload": "EncPayload...",   // required, encrypted message
+    "encryptedKey": "EncKey..."            // optional, encrypted key
+  }
+
+  Response (201 Created):
+  {
+    "id": "c163d6e2-...",
+    "senderId": "4afa4261-...",
+    "receiverId": null,
+    "groupId": "3c538929-...",
+    "encryptedPayload": "EncPayload...",
+    "encryptedKey": "EncKey...",
+    "timestamp": "2026-04-22T01:43:10.298",
+    "status": "SENT"
+  }
+
+
+--- 4.6  Get All Messages in a Group ---
+
+  Method:   GET
+  URL:      /groups/{groupId}/messages
+  Auth:     Required
+
+  Path Params:
+    groupId (UUID) — The group ID
+
+  Response (200 OK):
+  [
+    {
+      "id": "c163d6e2-...",
+      "senderId": "4afa4261-...",
+      "receiverId": null,
+      "groupId": "3c538929-...",
+      "encryptedPayload": "...",
+      "encryptedKey": "...",
+      "timestamp": "2026-04-22T01:43:10.298",
+      "status": "SENT"
+    }
+  ]
+
+
+--- 4.7  Store Encrypted Group Keys ---
+
+  Method:   POST
+  URL:      /groups/{groupId}/keys
+  Auth:     Required
+  Content-Type: application/json
+
+  Path Params:
+    groupId (UUID) — The group ID
+
+  Request Body (Array):
+  [
+    {
+      "userId": "4afa4261-...",           // required, UUID
+      "encryptedGroupKey": "EncKey..."    // required, encrypted key for this user
+    },
+    {
+      "userId": "f3ac4537-...",
+      "encryptedGroupKey": "EncKey2..."
+    }
+  ]
+
+  Response (200 OK):
+  {
+    "message": "Group keys stored successfully"
+  }
+
+
+--- 4.8  Get All Group Keys ---
+
+  Method:   GET
+  URL:      /groups/{groupId}/keys
+  Auth:     Required
+
+  Path Params:
+    groupId (UUID) — The group ID
+
+  Response (200 OK):
+  [
+    {
+      "id": "7ac2e717-...",
+      "groupId": "3c538929-...",
+      "userId": "4afa4261-...",
+      "encryptedGroupKey": "EncKeyForAlice=="
+    },
+    {
+      "id": "c8d87b97-...",
+      "groupId": "3c538929-...",
+      "userId": "f3ac4537-...",
+      "encryptedGroupKey": "EncKeyForBob=="
+    }
+  ]
+
+
+--- 4.9  Get a Specific User's Group Key ---
+
+  Method:   GET
+  URL:      /groups/{groupId}/keys/{userId}
+  Auth:     Required
+
+  Path Params:
+    groupId (UUID) — The group ID
+    userId  (UUID) — The user's ID
+
+  Response (200 OK):
+  {
+    "id": "7ac2e717-...",
+    "groupId": "3c538929-...",
+    "userId": "4afa4261-...",
+    "encryptedGroupKey": "EncKeyForAlice=="
+  }
+
+
+==============================================================================
+5. WEBSOCKET (REAL-TIME MESSAGING)
+==============================================================================
+
+  Connection URL:    ws://localhost:8080/ws   (via SockJS: http://localhost:8080/ws)
+  Protocol:          STOMP over SockJS
+
+  Connect Headers (when security is enabled):
+  {
+    "Authorization": "Bearer <JWT_TOKEN>"
+  }
+
+
+--- 5.1  Send a Direct Message (Client → Server) ---
+
+  Destination:  /app/chat.send
+
+  Payload:
+  {
+    "senderId": "4afa4261-...",            // required, UUID
+    "receiverId": "f3ac4537-...",          // required for DMs, UUID
+    "encryptedPayload": "EncMessage...",   // required, encrypted message
+    "encryptedKey": "EncAESKey..."         // optional, encrypted AES key
+  }
+
+
+--- 5.2  Send a Group Message (Client → Server) ---
+
+  Destination:  /app/chat.group
+
+  Payload:
+  {
+    "senderId": "4afa4261-...",            // required, UUID
+    "groupId": "3c538929-...",             // required for group msgs, UUID
+    "encryptedPayload": "EncMessage...",   // required
+    "encryptedKey": "EncAESKey..."         // optional
+  }
+
+
+--- 5.3  Update Message Status (Client → Server) ---
+
+  Destination:  /app/chat.status
+
+  Payload:
+  {
+    "id": "message-uuid-...",              // required, message UUID
+    "status": "READ"                       // required, "SENT" | "DELIVERED" | "READ"
+  }
+
+
+--- 5.4  Receive Messages (Server → Client) ---
+
+  Subscribe to:  /user/{yourUserId}/queue/messages
+
+  Received Payload (same as MessageResponse):
+  {
+    "id": "22d5316d-...",
+    "senderId": "4afa4261-...",
+    "receiverId": "f3ac4537-...",
+    "groupId": null,
+    "encryptedPayload": "...",
+    "encryptedKey": "...",
+    "timestamp": "2026-04-22T01:42:14.328981",
+    "status": "SENT"
+  }
+
+
+--- 5.5  Receive Status Updates (Server → Client) ---
+
+  Subscribe to:  /user/{yourUserId}/queue/status
+
+  Received Payload (same as MessageResponse):
+  {
+    "id": "22d5316d-...",
+    "senderId": "...",
+    "receiverId": "...",
+    "status": "READ"
+  }
+
+
+==============================================================================
+6. DATA TYPES & ENUMS
+==============================================================================
+
+  MessageStatus enum:
+    "SENT"       — Message saved on server
+    "DELIVERED"  — Message delivered to receiver
+    "READ"       — Message read by receiver
+
+  GroupRole enum (internal, not exposed in API):
+    "ADMIN"      — Group creator
+    "MEMBER"     — Regular member
+
+  All IDs are UUIDs:  e.g. "4afa4261-35b9-41d3-b4ce-94649dcb7d6f"
+  All timestamps:     ISO 8601 format, e.g. "2026-04-22T01:42:14.328981"
+
+
+==============================================================================
+7. ERROR RESPONSES
+==============================================================================
+
+  Validation Error (400):
+  {
+    "fieldName": "error message"
+  }
+
+  Not Found (404):
+  {
+    "message": "User not found with id: ..."
+  }
+
+  Server Error (500):
+  {
+    "error": "Internal Server Error"
+  }
+
+
+==============================================================================
+8. SUMMARY TABLE
+==============================================================================
+
+  Method  | Endpoint                            | Auth | Description
+  --------|-------------------------------------|------|------------------------------
+  POST    | /auth/register                      | No   | Register new user
+  POST    | /auth/login                         | No   | Login, get JWT
+  GET     | /auth/health                        | No   | Health check
+  GET     | /users                              | Yes  | Get all users
+  GET     | /users/{userId}                     | Yes  | Get user by ID
+  PUT     | /users/{userId}/public-key          | Yes  | Upload RSA public key
+  GET     | /users/{userId}/public-key          | Yes  | Get user's public key
+  GET     | /users/{userId}/online              | Yes  | Check online status
+  POST    | /messages/send                      | Yes  | Send encrypted DM
+  GET     | /messages/{userId}?currentUserId=X  | Yes  | Get chat history
+  PATCH   | /messages/{messageId}/status        | Yes  | Update message status
+  GET     | /messages/undelivered/{userId}      | Yes  | Get undelivered messages
+  POST    | /groups                             | Yes  | Create group
+  GET     | /groups/user/{userId}               | Yes  | Get user's groups
+  POST    | /groups/{groupId}/members           | Yes  | Add member
+  DELETE  | /groups/{groupId}/members/{userId}  | Yes  | Remove member
+  POST    | /groups/{groupId}/messages          | Yes  | Send group message
+  GET     | /groups/{groupId}/messages          | Yes  | Get group messages
+  POST    | /groups/{groupId}/keys              | Yes  | Store group keys
+  GET     | /groups/{groupId}/keys              | Yes  | Get all group keys
+  GET     | /groups/{groupId}/keys/{userId}     | Yes  | Get user's group key
+
+  WebSocket Destinations:
+  /app/chat.send                              | Send DM
+  /app/chat.group                             | Send group message
+  /app/chat.status                            | Update status
+  /user/{userId}/queue/messages               | Receive messages
+  /user/{userId}/queue/status                 | Receive status updates
+
+==============================================================================
