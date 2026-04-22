@@ -3,6 +3,8 @@ node_modules/
 target/
 .idea/
 .vscode/
+.mvn/
+mvnw.cmd
 *.iml
 .git/
 .gitignore

@@ -1,17 +1,13 @@
-# Stage 1: Build
-FROM eclipse-temurin:17-jdk-alpine AS build
+# Stage 1: Build with Maven
+FROM maven:3.9-eclipse-temurin-17-alpine AS build
 WORKDIR /app
-COPY .mvn/ .mvn/
-COPY mvnw.cmd mvnw pom.xml ./
-# Fix line endings for mvnw if needed
-RUN if [ -f mvnw ]; then chmod +x mvnw; fi
+COPY pom.xml ./
 # Download dependencies first (cached layer)
-RUN ./mvnw dependency:go-offline -B 2>/dev/null || true
+RUN mvn dependency:go-offline -B
 COPY src/ src/
-RUN ./mvnw clean package -DskipTests -B 2>/dev/null || \
-    (chmod +x mvnw.cmd && ./mvnw.cmd clean package -DskipTests -B)
+RUN mvn clean package -DskipTests -B
 
-# Stage 2: Run
+# Stage 2: Run with lightweight JRE
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/chatapp-1.0.0.jar app.jar
