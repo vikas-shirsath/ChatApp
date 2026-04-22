@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,20 +20,28 @@ import java.util.UUID;
 public class MessageController {
 
     private final MessageService messageService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Send an encrypted direct message via REST API.
+     * Also broadcasts to the receiver via WebSocket for real-time delivery.
      */
     @PostMapping("/send")
     public ResponseEntity<MessageResponse> sendMessage(@Valid @RequestBody SendMessageRequest request) {
         MessageResponse response = messageService.sendMessage(request);
+
+        // Broadcast to receiver via WebSocket so they see it instantly
+        messagingTemplate.convertAndSendToUser(
+                request.getReceiverId().toString(),
+                "/queue/messages",
+                response
+        );
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
      * Get chat history between the authenticated user and another user.
-     * The currentUserId should be extracted from JWT in production;
-     * here we accept it as a query parameter for simplicity.
      */
     @GetMapping("/{userId}")
     public ResponseEntity<List<MessageResponse>> getChatHistory(

@@ -3,11 +3,13 @@ package com.chatapp.controller;
 import com.chatapp.dto.group.*;
 import com.chatapp.dto.message.MessageResponse;
 import com.chatapp.model.GroupEncryptedKey;
+import com.chatapp.model.GroupMember;
 import com.chatapp.service.GroupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +22,7 @@ import java.util.UUID;
 public class GroupController {
 
     private final GroupService groupService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Create a new group.
@@ -72,6 +75,19 @@ public class GroupController {
             @Valid @RequestBody SendGroupMessageRequest request
     ) {
         MessageResponse response = groupService.sendGroupMessage(groupId, request);
+
+        // Broadcast to all group members via WebSocket (except sender)
+        List<GroupMember> members = groupService.getGroupMembers(groupId);
+        for (GroupMember member : members) {
+            if (!member.getUserId().equals(request.getSenderId())) {
+                messagingTemplate.convertAndSendToUser(
+                        member.getUserId().toString(),
+                        "/queue/messages",
+                        response
+                );
+            }
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

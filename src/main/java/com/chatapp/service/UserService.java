@@ -57,7 +57,7 @@ public class UserService {
                 .email(user.getEmail())
                 .publicKey(user.getPublicKey())
                 .createdAt(user.getCreatedAt())
-                .online(presenceService.isOnline(user.getId()))
+                .online(true)
                 .build();
     }
 }
