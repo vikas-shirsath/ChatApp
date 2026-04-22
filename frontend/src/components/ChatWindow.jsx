@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getChatHistory, sendMessage } from '../services/messageService';
+import { sendGroupMessage, getGroupMessages } from '../services/groupService';
 import { getPublicKey } from '../services/userService';
 import { encryptMessage, decryptMessage } from '../utils/crypto';
 import MessageBubble from './MessageBubble';
@@ -29,34 +30,54 @@ export default function ChatWindow({ currentUser, chat, incomingMsg }) {
   const inputRef = useRef(null);
 
   const privateKey = localStorage.getItem('privateKey');
+  const isGroup = chat?.type === 'group';
 
+  // Load chat history on chat change
   useEffect(() => {
     if (!chat) return;
     setMessages([]);
     setReceiverPubKey(null);
     inputRef.current?.focus();
 
-    getPublicKey(chat.id)
-      .then((res) => setReceiverPubKey(res.data.publicKey || null))
-      .catch(() => {});
+    if (isGroup) {
+      // Load group messages
+      getGroupMessages(chat.id)
+        .then(async (res) => {
+          const decrypted = await Promise.all(
+            res.data.map(async (msg) => ({ ...msg, plaintext: await getPlaintext(msg) }))
+          );
+          setMessages(decrypted);
+        })
+        .catch((err) => console.error('Group history load failed:', err));
+    } else {
+      // Load DM – fetch receiver's public key + history
+      getPublicKey(chat.id)
+        .then((res) => setReceiverPubKey(res.data.publicKey || null))
+        .catch(() => {});
 
-    getChatHistory(chat.id, currentUser.userId)
-      .then(async (res) => {
-        const decrypted = await Promise.all(
-          res.data.map(async (msg) => ({ ...msg, plaintext: await getPlaintext(msg) }))
-        );
-        setMessages(decrypted);
-      })
-      .catch((err) => console.error('History load failed:', err));
+      getChatHistory(chat.id, currentUser.userId)
+        .then(async (res) => {
+          const decrypted = await Promise.all(
+            res.data.map(async (msg) => ({ ...msg, plaintext: await getPlaintext(msg) }))
+          );
+          setMessages(decrypted);
+        })
+        .catch((err) => console.error('History load failed:', err));
+    }
   }, [chat, currentUser.userId]);
 
   // Real-time incoming messages
   useEffect(() => {
     if (!incomingMsg || !chat) return;
 
-    const isForThisChat =
-      (incomingMsg.senderId === chat.id && incomingMsg.receiverId === currentUser.userId) ||
-      (incomingMsg.senderId === currentUser.userId && incomingMsg.receiverId === chat.id);
+    let isForThisChat = false;
+    if (isGroup) {
+      isForThisChat = incomingMsg.groupId === chat.id;
+    } else {
+      isForThisChat =
+        (incomingMsg.senderId === chat.id && incomingMsg.receiverId === currentUser.userId) ||
+        (incomingMsg.senderId === currentUser.userId && incomingMsg.receiverId === chat.id);
+    }
 
     if (isForThisChat) {
       (async () => {
@@ -72,11 +93,13 @@ export default function ChatWindow({ currentUser, chat, incomingMsg }) {
   async function getPlaintext(msg) {
     const payload = msg.encryptedPayload;
 
+    // Check sent cache first
     if (msg.senderId === currentUser.userId) {
       const cached = getSentCache()[msg.id];
       if (cached) return cached;
     }
 
+    // Try E2EE decryption for DM
     if (privateKey && msg.encryptedKey && msg.encryptedKey !== 'plaintext-key' && msg.encryptedKey !== '') {
       try {
         const decrypted = await decryptMessage(payload, msg.encryptedKey, privateKey);
@@ -84,6 +107,7 @@ export default function ChatWindow({ currentUser, chat, incomingMsg }) {
       } catch (e) { /* fall through */ }
     }
 
+    // If it doesn't look encrypted, show as-is
     if (payload && !looksLikeBase64(payload)) return payload;
 
     return msg.senderId === currentUser.userId ? '[Sent message]' : '[Encrypted]';
@@ -102,17 +126,25 @@ export default function ChatWindow({ currentUser, chat, incomingMsg }) {
     setSending(true);
 
     try {
-      let payload, key;
-      if (receiverPubKey) {
-        const encrypted = await encryptMessage(plaintext, receiverPubKey);
-        payload = encrypted.encryptedPayload;
-        key = encrypted.encryptedKey;
+      let res;
+
+      if (isGroup) {
+        // Group message – send plaintext (group E2EE not yet implemented)
+        res = await sendGroupMessage(chat.id, currentUser.userId, plaintext, '');
       } else {
-        payload = plaintext;
-        key = '';
+        // DM – encrypt if public key available
+        let payload, key;
+        if (receiverPubKey) {
+          const encrypted = await encryptMessage(plaintext, receiverPubKey);
+          payload = encrypted.encryptedPayload;
+          key = encrypted.encryptedKey;
+        } else {
+          payload = plaintext;
+          key = '';
+        }
+        res = await sendMessage(currentUser.userId, chat.id, payload, key);
       }
 
-      const res = await sendMessage(currentUser.userId, chat.id, payload, key);
       cacheSentMsg(res.data.id, plaintext);
       setMessages((prev) => [...prev, { ...res.data, plaintext }]);
     } catch (err) {
@@ -123,20 +155,23 @@ export default function ChatWindow({ currentUser, chat, incomingMsg }) {
     }
   };
 
+  const chatName = isGroup ? chat.name : chat.username;
+
   return (
     <div className="chat-window">
       {/* Top bar */}
       <div className="chat-topbar">
-        <div className="avatar">
-          {chat.username[0].toUpperCase()}
-          {chat.online && <div className="online-dot" />}
+        <div className={`avatar ${isGroup ? 'group-avatar' : ''}`}>
+          {(chatName || '?')[0].toUpperCase()}
+          {!isGroup && chat.online && <div className="online-dot" />}
         </div>
         <div className="chat-topbar-info">
-          <div className="chat-topbar-name">{chat.username}</div>
+          <div className="chat-topbar-name">{chatName}</div>
           <div className="chat-topbar-status">
-            {chat.online && <span className="online-text">Online</span>}
-            {!chat.online && <span>Offline</span>}
-            {receiverPubKey && <span className="encrypted-badge">🔒 E2EE</span>}
+            {isGroup && <span>{chat.memberCount} members</span>}
+            {!isGroup && chat.online && <span className="online-text">Online</span>}
+            {!isGroup && !chat.online && <span>Offline</span>}
+            {!isGroup && receiverPubKey && <span className="encrypted-badge">🔒 E2EE</span>}
           </div>
         </div>
       </div>
@@ -145,8 +180,8 @@ export default function ChatWindow({ currentUser, chat, incomingMsg }) {
       <div className="messages-area">
         {messages.length === 0 && (
           <div className="messages-empty">
-            <span className="emoji">👋</span>
-            <p>Start a conversation with {chat.username}</p>
+            <span className="emoji">{isGroup ? '👥' : '👋'}</span>
+            <p>{isGroup ? `Start chatting in ${chatName}` : `Start a conversation with ${chatName}`}</p>
           </div>
         )}
 
@@ -166,7 +201,7 @@ export default function ChatWindow({ currentUser, chat, incomingMsg }) {
           <input
             ref={inputRef}
             type="text"
-            placeholder={receiverPubKey ? '🔒 Type an encrypted message...' : 'Type a message...'}
+            placeholder={isGroup ? 'Type a group message...' : (receiverPubKey ? '🔒 Type an encrypted message...' : 'Type a message...')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             autoFocus

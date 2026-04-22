@@ -36,19 +36,29 @@ export default function Chat() {
       user.userId,
       (msg) => {
         const current = selectedChatRef.current;
-        const isFromCurrentChat =
-          current &&
-          ((msg.senderId === current.id && msg.receiverId === user.userId) ||
-           (msg.senderId === user.userId && msg.receiverId === current.id));
+
+        // Check if message belongs to the currently open chat
+        let isFromCurrentChat = false;
+        if (current) {
+          if (current.type === 'group') {
+            // Group chat — match by groupId
+            isFromCurrentChat = msg.groupId === current.id;
+          } else {
+            // DM — match by senderId/receiverId
+            isFromCurrentChat =
+              (msg.senderId === current.id && msg.receiverId === user.userId) ||
+              (msg.senderId === user.userId && msg.receiverId === current.id);
+          }
+        }
 
         if (isFromCurrentChat) {
-          // Pass to ChatWindow for real-time display
           setIncomingMsg(msg);
         } else if (msg.senderId !== user.userId) {
           // Not the open chat — show notification + increment unread
+          const unreadKey = msg.groupId || msg.senderId;
           setUnreadCounts((prev) => ({
             ...prev,
-            [msg.senderId]: (prev[msg.senderId] || 0) + 1,
+            [unreadKey]: (prev[unreadKey] || 0) + 1,
           }));
           showNotification(msg);
         }
