@@ -132,6 +132,10 @@ public class MessageService {
                 .collect(Collectors.toList());
     }
 
+    public List<UUID> getConversationPartners(UUID userId) {
+        return messageRepository.findConversationPartners(userId);
+    }
+
     private MessageResponse toMessageResponse(Message message) {
         return MessageResponse.builder()
                 .id(message.getId())

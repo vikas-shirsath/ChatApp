@@ -63,4 +63,13 @@ public class MessageController {
         List<MessageResponse> messages = messageService.getUndeliveredMessages(userId);
         return ResponseEntity.ok(messages);
     }
+
+    /**
+     * Get list of user IDs that the given user has had conversations with.
+     */
+    @GetMapping("/conversations/{userId}")
+    public ResponseEntity<List<UUID>> getConversations(@PathVariable UUID userId) {
+        List<UUID> partners = messageService.getConversationPartners(userId);
+        return ResponseEntity.ok(partners);
+    }
 }

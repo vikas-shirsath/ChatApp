@@ -46,6 +46,10 @@ public class UserService {
         return user.getPublicKey();
     }
 
+    public java.util.List<User> searchByUsername(String query) {
+        return userRepository.findByUsernameContainingIgnoreCase(query);
+    }
+
     public UserResponse toUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())

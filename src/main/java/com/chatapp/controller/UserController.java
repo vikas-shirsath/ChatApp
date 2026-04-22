@@ -28,6 +28,13 @@ public class UserController {
                 .toList());
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<java.util.List<UserResponse>> searchUsers(@RequestParam String username) {
+        return ResponseEntity.ok(userService.searchByUsername(username).stream()
+                .map(userService::toUserResponse)
+                .toList());
+    }
+
     @GetMapping("/{userId}")
     public ResponseEntity<UserResponse> getUser(@PathVariable UUID userId) {
         User user = userService.getUserById(userId);

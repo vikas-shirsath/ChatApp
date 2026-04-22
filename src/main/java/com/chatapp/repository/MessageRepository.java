@@ -24,4 +24,9 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 
     @Query("SELECT m FROM Message m WHERE m.receiverId = :userId AND m.status = 'SENT' AND m.groupId IS NULL")
     List<Message> findUndeliveredMessages(@Param("userId") UUID userId);
+
+    @Query("SELECT DISTINCT m.receiverId FROM Message m WHERE m.senderId = :userId AND m.groupId IS NULL " +
+            "UNION " +
+            "SELECT DISTINCT m.senderId FROM Message m WHERE m.receiverId = :userId AND m.groupId IS NULL")
+    List<UUID> findConversationPartners(@Param("userId") UUID userId);
 }
